@@ -15,7 +15,7 @@ namespace Exquance
         static async Task Main(string[] args)
         {
             IFormulaEvaluator _evaluator = new FormulaEvaluator();
-            IFileReader _fileReader = new FileReader();
+            IFileService _fileService = new FileService();
             IValidator _validator = new Validator();
 
             Console.WriteLine("Hello, user! Please follow instructions below: \n");
@@ -59,26 +59,19 @@ namespace Exquance
                     formula = Console.ReadLine();
                 }
 
-                List<FileLine> lines = _fileReader.MapFileLines(fileLines);
+                List<FileLine> lines = _fileService.MapFileLines(fileLines);
+                Parallel.ForEach(lines, l => l.CalculatedValue = _evaluator.EvaluateExpression(formula.ToLower().Replace("x", l.Value.ToString())));
 
                 if (outParameter.ToLower().Equals("-f"))
                 {
-                    List<string> outputFileLines = new();
-                    foreach (var line in lines)
-                    {
-                        outputFileLines.Add($"{line.LineNumber}: {line.Value}: " +
-                            $"{_evaluator.EvaluateExpression(formula.ToLower().Replace("x", line.Value.ToString()))}");
-                    }
-                    await File.WriteAllLinesAsync(
-                        path: $"{Path.GetDirectoryName(filePath)}\\Thread{Thread.CurrentThread.ManagedThreadId}-{Path.GetFileName(filePath)}",
-                        contents: outputFileLines);
+                    await _fileService.WriteLinesToFileAsync(filePath, lines);
+                    Console.WriteLine("File with results written to source directory");
                 }
                 else
                 {
                     foreach (var line in lines)
                     {
-                        Console.WriteLine($"{line.LineNumber}: {line.Value}: " +
-                            $"{_evaluator.EvaluateExpression(formula.ToLower().Replace("x", line.Value.ToString()))}");
+                        Console.WriteLine($"{line.LineNumber}: {line.Value}: {line.CalculatedValue}");
                     }
                 }
             }

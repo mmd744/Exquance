@@ -38,7 +38,6 @@ namespace Exquance.Services.Implementation
                     digitsCount++;
                 }
             }
-            if (!cells.Any()) throw new Exception("Wrong formula");
             return cells;
         }
 

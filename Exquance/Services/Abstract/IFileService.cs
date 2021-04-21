@@ -7,8 +7,9 @@ using System.Threading.Tasks;
 
 namespace Exquance.Services.Abstract
 {
-    public interface IFileReader
+    public interface IFileService
     {
+        Task WriteLinesToFileAsync(string filePath, List<FileLine> lines);
         List<FileLine> MapFileLines(string[] fileLines);
     }
 }

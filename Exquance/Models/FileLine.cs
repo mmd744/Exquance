@@ -15,5 +15,6 @@ namespace Exquance.Models
         }
         public int LineNumber { get; set; }
         public int Value { get; set; }
+        public int CalculatedValue { get; set; }
     }
 }
