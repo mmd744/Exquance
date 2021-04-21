@@ -14,6 +14,8 @@ namespace Exquance
     {
         static async Task Main(string[] args)
         {
+            Console.ForegroundColor = ConsoleColor.Green;
+
             IFormulaEvaluator _evaluator = new FormulaEvaluator();
             IFileService _fileService = new FileService();
             IValidator _validator = new Validator();
@@ -60,11 +62,12 @@ namespace Exquance
                 }
 
                 List<FileLine> lines = _fileService.MapFileLines(fileLines);
-                Parallel.ForEach(lines, l => l.CalculatedValue = _evaluator.EvaluateExpression(formula.ToLower().Replace("x", l.Value.ToString())));
+                Parallel.ForEach(lines, l => l.CalculatedValue = 
+                    _evaluator.EvaluateExpression(formula.ToLower().Replace("x", l.Value.ToString())));
 
                 if (outParameter.ToLower().Equals("-f"))
                 {
-                    await _fileService.WriteLinesToFileAsync(filePath, lines);
+                    await Task.Run(() => _fileService.WriteLinesToFileAsync(filePath, lines));
                     Console.WriteLine("File with results written to source directory");
                 }
                 else
