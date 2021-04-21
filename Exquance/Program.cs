@@ -40,7 +40,7 @@ namespace Exquance
                     filePath = Console.ReadLine();
                 }
 
-                var fileLines = await _fileReader.GetFileLinesAsync(filePath);
+                var fileLines = await File.ReadAllLinesAsync(filePath);
                 if (!_validator.FileLinesAreValid(fileLines)) return;
 
                 Console.WriteLine("Choose out parameter: ('-f' for file / '-c' for console)");

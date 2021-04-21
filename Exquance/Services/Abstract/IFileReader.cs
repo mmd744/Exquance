@@ -9,7 +9,6 @@ namespace Exquance.Services.Abstract
 {
     public interface IFileReader
     {
-        Task<string[]> GetFileLinesAsync(string filePath);
         List<FileLine> MapFileLines(string[] fileLines);
     }
 }

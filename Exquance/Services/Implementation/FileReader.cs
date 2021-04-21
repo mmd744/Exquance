@@ -12,11 +12,6 @@ namespace Exquance.Services.Implementation
 {
     public class FileReader : IFileReader
     {
-        public async Task<string[]> GetFileLinesAsync(string filePath)
-        {
-            return await File.ReadAllLinesAsync(filePath);
-        }
-
         public List<FileLine> MapFileLines(string[] fileLines)
         {
             int index = 0;
