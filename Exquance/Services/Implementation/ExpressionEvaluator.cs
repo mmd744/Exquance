@@ -35,8 +35,9 @@ namespace Exquance.Services.Implementation
                         continue;
                     }
                 }
+                return cells.First().Value;
             }
-            return cells.First().Value;
+            return 0;
         }
     }
 }

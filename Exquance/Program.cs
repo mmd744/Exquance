@@ -63,10 +63,23 @@ namespace Exquance
                 }
 
                 List<FileLine> lines = _fileService.MapFileLines(fileLines);
-                await Task.Run(() => // cpu-bound operation, better to perform in a separate thread
+                try
                 {
-                    Parallel.ForEach(lines, l => l.CalculatedValue = _evaluator.EvaluateExpression(formula.ToLower().Replace("x", l.Value.ToString())));
-                });
+                    await Task.Run(() => // cpu-bound operation, better to perform in a separate thread
+                    {
+                        Parallel.ForEach(lines, l => l.CalculatedValue = _evaluator.EvaluateExpression(formula.ToLower().Replace("x", l.Value.ToString())));
+                    });
+                }
+                catch (FormatException)
+                {
+                    Console.WriteLine("Wrong formula");
+                    return;
+                }
+                catch (Exception)
+                {
+                    Console.WriteLine("Something went wrong while evaluating expression");
+                }
+                
 
                 if (outParameter.ToLower().Equals("-f"))
                 {
