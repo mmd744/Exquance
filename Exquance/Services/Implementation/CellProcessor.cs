@@ -45,9 +45,6 @@ namespace Exquance.Services.Implementation
         {
             switch (leftCell.Action)
             {
-                case '^':
-                    leftCell.Value = (int)Math.Pow(leftCell.Value, rightCell.Value);
-                    break;
                 case '*':
                     leftCell.Value *= rightCell.Value;
                     break;

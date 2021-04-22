@@ -22,7 +22,6 @@ namespace Exquance.Models
             {
                 return this.Action switch
                 {
-                    '^' => 4,
                     '*' or '/' => 3,
                     '+' or '-' => 2,
                     _ => 0 // default

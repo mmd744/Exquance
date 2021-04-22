@@ -16,7 +16,7 @@ namespace Exquance.Extensions
         /// <returns></returns>
         public static bool IsValidAction(this char ch)
         {
-            return ch == '*' || ch == '/' || ch == '+' || ch == '-' || ch == '^' || ch == '|';
+            return ch == '*' || ch == '/' || ch == '+' || ch == '-' || ch == '|';
         }
     }
 }
