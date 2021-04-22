@@ -16,17 +16,18 @@ namespace Exquance
         {
             Console.ForegroundColor = ConsoleColor.Blue;
 
-            IFormulaEvaluator _evaluator = new FormulaEvaluator();
+            IExpressionEvaluator _evaluator = new ExpressionEvaluator();
             IFileService _fileService = new FileService();
             IValidator _validator = new Validator();
+            ICellProcessor _cellService = new CellProcessor();
 
-            Console.WriteLine("Hello, user! Please follow instructions below: \n");
-            Console.WriteLine("How many files do you want to process?");
+            Interactions.GreetUser();
+            Interactions.AskForFilesCount();
             string filesCount = Console.ReadLine();
             int filesCountNum;
             while (!_validator.FilesCountIsValid(filesCount, out filesCountNum))
             {
-                Console.WriteLine("How many files do you want to process?");
+                Interactions.AskForFilesCount();
                 filesCount = Console.ReadLine();
             }
 
@@ -34,30 +35,30 @@ namespace Exquance
             {
                 string filePath, outParameter, formula;
 
-                Console.WriteLine("Paste source file path: ");
+                Interactions.AskForSrcFilePath();
                 filePath = Console.ReadLine();
                 while (!_validator.FilePathIsValid(filePath))
                 {
-                    Console.WriteLine("Paste source file path: ");
+                    Interactions.AskForSrcFilePath();
                     filePath = Console.ReadLine();
                 }
 
                 var fileLines = await File.ReadAllLinesAsync(filePath);
                 if (!_validator.FileLinesAreValid(fileLines)) return;
 
-                Console.WriteLine("Choose out parameter: ('-f' for file / '-c' for console)");
+                Interactions.AskForOutParameter();
                 outParameter = Console.ReadLine();
                 while (!_validator.OutParameterIsValid(outParameter))
                 {
-                    Console.WriteLine("Choose out parameter: ('-f' for file / '-c' for console)");
+                    Interactions.AskForOutParameter();
                     outParameter = Console.ReadLine();
                 }
 
-                Console.WriteLine("Type out formula (example: x + 1 - 20): ");
+                Interactions.AskForFormula();
                 formula = Console.ReadLine();
                 while (!_validator.FormulaIsValid(formula))
                 {
-                    Console.WriteLine("Type out formula (example: x + 1 - 20): ");
+                    Interactions.AskForFormula();
                     formula = Console.ReadLine();
                 }
 
@@ -70,7 +71,7 @@ namespace Exquance
                 if (outParameter.ToLower().Equals("-f"))
                 {
                     await _fileService.WriteLinesToFileAsync(filePath, lines); // I/O-bound operation, better to await without Task.Run()
-                    Console.WriteLine("File with results was written to source directory");
+                    Interactions.AnnounceSuccess();
                 }
                 else
                 {

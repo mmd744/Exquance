@@ -7,18 +7,18 @@ using System.Threading.Tasks;
 
 namespace Exquance.Services.Implementation
 {
-    public class FormulaEvaluator : IFormulaEvaluator
+    public class ExpressionEvaluator : Abstract.IExpressionEvaluator
     {
         private readonly ICellProcessor _cellProcessor;
 
-        public FormulaEvaluator()
+        public ExpressionEvaluator()
         {
             _cellProcessor = new CellProcessor();
         }
 
-        public int EvaluateExpression(string formula)
+        public int EvaluateExpression(string finalExpression)
         {
-            var cells = _cellProcessor.CreateList(formula);
+            var cells = _cellProcessor.CreateList(finalExpression);
             if (cells.Count > 1)
             {
                 for (int i = 0; i < cells.Count - 1;)

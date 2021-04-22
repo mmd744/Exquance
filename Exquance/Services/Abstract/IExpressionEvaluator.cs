@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Exquance.Services.Abstract
 {
-    public interface IFormulaEvaluator
+    public interface IExpressionEvaluator
     {
         int EvaluateExpression(string formula);
     }
