@@ -5,94 +5,137 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Security.Permissions;
 using System.Threading.Tasks;
+using System.Security;
+using System.Security.AccessControl;
 
 namespace Exquance.Services.Implementation
 {
     public class Validator : BaseValidator, IValidator
     {
+
         public bool FileLinesAreValid(string[] fileLines)
         {
             bool result = true;
-            try
+            Parallel.ForEach(fileLines, fl =>
             {
-                foreach (var fl in fileLines)
+                if (!int.TryParse(fl.RemoveAllWhiteSpaces(), out int num))
                 {
-                    int.Parse(fl.RemoveAllWhiteSpaces());
+                    result = false;
                 }
-                //Parallel.ForEach(fileLines, fl => int.Parse(fl.RemoveAllWhiteSpaces()));
-            }
-            catch (FormatException)
-            {
-                Console.WriteLine("Not a number");
-                result = false;
-            }
+            });
+
             return result;
         }
 
-        public bool FilePathIsValid(string filePath)
+        public bool FilePathIsValid(string filePath, IEnumerable<string> alreadyStoredPaths)
         {
-            bool result = true;
             if (!base.ParamIsValid(filePath, "File path", out string errMsg))
             {
                 Console.WriteLine(errMsg);
-                result = false;
+                return false;
+            }
+            else if (!IsAccessible(filePath))
+            {
+                Console.WriteLine("Not enough permissions for accessing this file");
+                return false;
             }
             else if (!File.Exists(filePath))
             {
                 Console.WriteLine("File not found");
-                result = false;
+                return false;
             }
-            return result;
-        }
-
-        public bool FilesCountIsValid(string filesCount, out int count)
-        {
-            bool result = true;
-            if (!base.ParamIsValid(filesCount, "Files count", out string errMsg))
+            else if (alreadyStoredPaths.Contains(filePath))
             {
-                Console.WriteLine(errMsg);
-                result = false;
-                count = 0;
+                Console.WriteLine("You already added this file");
+                return false;
             }
-            else if (!int.TryParse(filesCount, out count))
-            {
-                Console.WriteLine("Not a number");
-                result = false;
-            }
-            return result;
+            return true;
         }
 
         public bool FormulaIsValid(string formula)
         {
-            bool result = true;
             if (!base.ParamIsValid(formula, "Formula", out string errMsg))
             {
                 Console.WriteLine(errMsg);
-                result = false;
+                return false;
             }
-            else if (!formula.ToLower().Contains("x"))
+            else if (formula.Length < 3)
             {
-                Console.WriteLine("Wrong formula");
-                result = false;
+                Console.WriteLine("Wrong formula (too short)");
+                return false;
             }
-            return result;
+            else if (formula.ToLower().Contains("/0"))
+            {
+                Console.WriteLine("Wrong formula (divzero)");
+                return false;
+            }
+            else if (!formula.Any(ch => char.IsLetter(ch)))
+            {
+                Console.WriteLine("Wrong formula (no variables)");
+                return false;
+            }
+
+            try
+            {
+                int digitsCount = 0;
+                string finalExpression = formula.Replace(formula.First(c => char.IsLetter(c)), '1') + '|'; // -3-44-25+2*3/3|
+                for (int i = 0; i < finalExpression.Length; i++)
+                {
+                    if (finalExpression[i].IsValidAction())
+                    {
+                        int value = int.Parse(finalExpression.Substring(i - digitsCount, digitsCount));
+                        digitsCount = 0;
+                    }
+                    else
+                    {
+                        digitsCount++;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Equals("Value was either too large or too small for an Int32."))
+                    Console.WriteLine("Too big numbers found in formula");
+                else
+                    Console.WriteLine("Wrong formula");
+
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool IsAccessible(string path)
+        {
+            DirectoryInfo dirInfo = new(path);
+            try
+            {
+#pragma warning disable CA1416 // Validate platform compatibility
+                DirectorySecurity dirAC = dirInfo.GetAccessControl(AccessControlSections.Access);
+#pragma warning restore CA1416 // Validate platform compatibility
+                return true;
+            }
+            catch (PrivilegeNotHeldException)
+            {
+                return false;
+            }
         }
 
         public bool OutParameterIsValid(string outParameter)
         {
-            bool result = true;
             if (!base.ParamIsValid(outParameter, "Out parameter", out string errMsg))
             {
                 Console.WriteLine(errMsg);
-                result = false;
+                return false;
             }
             else if (!outParameter.Equals("-c") && !outParameter.Equals("-f"))
             {
                 Console.WriteLine("Wrong our parameter");
-                result = false;
+                return false;
             }
-            return result;
+            return true;
         }
     }
 }

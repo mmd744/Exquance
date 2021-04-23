@@ -1,9 +1,11 @@
-﻿using Exquance.Models;
+﻿using Exquance.Extensions;
+using Exquance.Models;
 using Exquance.Services.Abstract;
 using Exquance.Services.Implementation;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,82 +19,145 @@ namespace Exquance
             Console.ForegroundColor = ConsoleColor.Blue;
 
             IExpressionEvaluator _evaluator = new ExpressionEvaluator();
-            IFileService _fileService = new FileService();
             IValidator _validator = new Validator();
             ICellProcessor _cellService = new CellProcessor();
 
             Interactions.GreetUser();
-            Interactions.AskForFilesCount();
-            string filesCount = Console.ReadLine();
-            int filesCountNum;
-            while (!_validator.FilesCountIsValid(filesCount, out filesCountNum))
-            {
-                Interactions.AskForFilesCount();
-                filesCount = Console.ReadLine();
-            }
 
-            for (int i = 0; i < filesCountNum; i++)
-            {
-                string filePath, outParameter, formula;
+            List<UserInput> inputs = new();
 
-                Interactions.AskForSrcFilePath();
-                filePath = Console.ReadLine();
-                while (!_validator.FilePathIsValid(filePath))
+            bool userFinished = false;
+            while (!userFinished)
+            {
+                string path = null, outputParam = null, formula = null;
+                bool pathIsValid = false;
+                while (!pathIsValid)
                 {
                     Interactions.AskForSrcFilePath();
-                    filePath = Console.ReadLine();
-                }
+                    string input = Console.ReadLine();
 
-                var fileLines = await File.ReadAllLinesAsync(filePath);
-                if (!_validator.FileLinesAreValid(fileLines)) return;
-
-                Interactions.AskForOutParameter();
-                outParameter = Console.ReadLine();
-                while (!_validator.OutParameterIsValid(outParameter))
-                {
-                    Interactions.AskForOutParameter();
-                    outParameter = Console.ReadLine();
-                }
-
-                Interactions.AskForFormula();
-                formula = Console.ReadLine();
-                while (!_validator.FormulaIsValid(formula))
-                {
-                    Interactions.AskForFormula();
-                    formula = Console.ReadLine();
-                }
-
-                List<FileLine> lines = _fileService.MapFileLines(fileLines);
-                try
-                {
-                    await Task.Run(() => // cpu-bound operation, better to perform in a separate thread
+                    if (input.Equals("start"))
                     {
-                        Parallel.ForEach(lines, l => l.CalculatedValue = _evaluator.EvaluateExpression(formula.ToLower().Replace("x", l.Value.ToString())));
-                    });
-                }
-                catch (FormatException)
-                {
-                    Console.WriteLine("Wrong formula");
-                    return;
-                }
-                catch (Exception)
-                {
-                    Console.WriteLine("Something went wrong while evaluating expression");
-                }
-                
-
-                if (outParameter.ToLower().Equals("-f"))
-                {
-                    await _fileService.WriteLinesToFileAsync(filePath, lines); // I/O-bound operation, better to await without Task.Run()
-                    Interactions.AnnounceSuccess();
-                }
-                else
-                {
-                    foreach (var line in lines)
+                        if (!inputs.Any())
+                        {
+                            Console.WriteLine("At least one file is required for proceeding");
+                        }
+                        else
+                        {
+                            userFinished = true;
+                            break;
+                        }
+                    }
+                    else
                     {
-                        Console.WriteLine($"{line.LineNumber}: {line.Value}: {line.CalculatedValue}");
+                        if (_validator.FilePathIsValid(input, inputs.Select(i => i.Path)))
+                        {
+                            path = input;
+                            pathIsValid = true;
+                        }
                     }
                 }
+                if (userFinished) break;
+
+                bool outputParamIsValid = false;
+                while (!outputParamIsValid)
+                {
+                    Interactions.AskForOutParameter();
+                    string input = Console.ReadLine();
+                    if (_validator.OutParameterIsValid(input))
+                    {
+                        outputParam = input;
+                        outputParamIsValid = true;
+                    }
+                }
+                bool formulaIsValid = false;
+                while (!formulaIsValid)
+                {
+                    Interactions.AskForFormula();
+                    string input = Console.ReadLine().RemoveAllWhiteSpaces();
+                    if (_validator.FormulaIsValid(input))
+                    {
+                        formula = input;
+                        formulaIsValid = true;
+                    }
+                }
+                if (pathIsValid && outputParamIsValid && formulaIsValid)
+                {
+                    inputs.Add(new UserInput
+                    {
+                        Path = path,
+                        Formula = formula,
+                        OutputParam = outputParam
+                    });
+                    Console.WriteLine("\nFile accepted\n");
+                }
+            }
+
+            IEnumerable<UserInput> consoleParamInputs = inputs.Where(i => i.OutputParam.RemoveAllWhiteSpaces().ToLower().Equals("-c"));
+            IEnumerable<UserInput> fileParamInputs = inputs.Except(consoleParamInputs);
+
+            if (fileParamInputs.Any())
+            {
+                await Task.Run(() =>
+                {
+                    Parallel.ForEach(fileParamInputs, async input =>
+                    {
+                        var folder = Path.GetDirectoryName(input.Path);
+                        var fileName = Path.GetFileName(input.Path);
+                        var fileLines = await File.ReadAllLinesAsync(input.Path);
+                        if (!_validator.FileLinesAreValid(fileLines))
+                        {
+                            Console.WriteLine($"{fileName} is not a valid file");
+                            return;
+                        }
+
+                        var outputFilePath = $"{folder}\\Thread{Thread.CurrentThread.ManagedThreadId}-{fileName}";
+                        if (File.Exists(outputFilePath))
+                            File.Delete(outputFilePath);
+
+                        using (StreamWriter writer = new(outputFilePath, true)) // true to append data to the file
+                        {
+                            int lineNum = 0;
+                            foreach (var line in fileLines)
+                            {
+                                lineNum++;
+                                var lineVal = int.Parse(line.RemoveAllWhiteSpaces());
+                                var variable = input.Formula.ToLower().First(ch => char.IsLetter(ch)).ToString();
+                                var calculatedVal = _evaluator.EvaluateExpression(input.Formula.ToLower().Replace(variable, lineVal.ToString()));
+                                await writer.WriteLineAsync($"{lineNum}: {lineVal}: {calculatedVal}");
+                            }
+                        }
+                    });
+                    Interactions.AnnounceSuccess();
+                });
+            }
+            
+            if (consoleParamInputs.Any())
+            {
+                await Task.Run(async () =>
+                {
+                    foreach (var input in consoleParamInputs)
+                    {
+                        var fileName = Path.GetFileName(input.Path);
+                        var fileLines = await File.ReadAllLinesAsync(input.Path);
+                        if (!_validator.FileLinesAreValid(fileLines))
+                        {
+                            Console.WriteLine($"{fileName} is not a valid file");
+                            continue;
+                        }
+
+                        int lineNum = 0;
+                        Console.WriteLine($"\n{fileName}:\n");
+                        foreach (var line in fileLines)
+                        {
+                            lineNum++;
+                            var lineVal = int.Parse(line.RemoveAllWhiteSpaces());
+                            var variable = input.Formula.ToLower().First(ch => char.IsLetter(ch)).ToString();
+                            var calculatedVal = _evaluator.EvaluateExpression(input.Formula.ToLower().Replace(variable, lineVal.ToString()));
+                            Console.WriteLine($"{lineNum}: {lineVal}: {calculatedVal}");
+                        }
+                    }
+                });
             }
 
             Console.ReadKey();

@@ -8,6 +8,6 @@ namespace Exquance.Services.Abstract
 {
     public interface IExpressionEvaluator
     {
-        int EvaluateExpression(string formula);
+        string EvaluateExpression(string formula);
     }
 }

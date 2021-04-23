@@ -29,7 +29,7 @@ namespace Exquance.Services.Implementation
                 }
                 else if (trimmedFormula[i].IsValidAction())
                 {
-                    var value = int.Parse(trimmedFormula.Substring(i - digitsCount, digitsCount));
+                    int value = int.Parse(trimmedFormula.Substring(i - digitsCount, digitsCount));
                     cells.Add(new Cell(value, trimmedFormula[i]));
                     digitsCount = 0;
                 }
