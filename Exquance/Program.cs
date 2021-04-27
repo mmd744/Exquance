@@ -91,7 +91,13 @@ namespace Exquance
                     {
                         Parallel.ForEach(fileLines, fl =>
                         {
-                            Console.WriteLine($"{fl.LineNum}: {fl.LineVal}: {_evaluator.EvaluateExpression(formula.Replace(variable, fl.LineVal))}");
+                            string outputVal = string.Empty;
+                            if (!fl.LineVal.Equals("Not a number"))
+                            {
+                                var calculatedVal = _evaluator.EvaluateExpression(formula.Replace(variable, fl.LineVal));
+                                outputVal = calculatedVal.ToString();
+                            }
+                            Console.WriteLine($"{fl.LineNum}: {fl.LineVal}: {outputVal}");
                         });
                     });
                     actualTasks.Add(consoleTask);
@@ -108,12 +114,18 @@ namespace Exquance
                     {
                         Parallel.ForEach(fileLines, fl =>
                         {
-                            var calculatedVal = _evaluator.EvaluateExpression(input.Formula.ToLower().Replace(variable, fl.LineVal));
+                            string outputVal = string.Empty;
+                            if (!fl.LineVal.Equals("Not a number"))
+                            {
+                                var calculatedVal = _evaluator.EvaluateExpression(input.Formula.ToLower().Replace(variable, fl.LineVal));
+                                outputVal = calculatedVal.ToString();
+                            }
+                                
                             lock (locker)
                             {
                                 using (StreamWriter writer = new(outputFilePath, true)) // true to append data to the file
                                 {
-                                    writer.WriteLine($"{fl.LineNum}: {fl.LineVal}: {calculatedVal}");
+                                    writer.WriteLine($"{fl.LineNum}: {fl.LineVal}: {outputVal}");
                                 }
                             }
                         });
