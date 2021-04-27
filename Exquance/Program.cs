@@ -14,7 +14,8 @@ namespace Exquance
 {
     class Program
     {
-        static async Task Main(string[] args)
+        private static readonly object locker = new();
+        static void Main(string[] args)
         {
             Console.ForegroundColor = ConsoleColor.Blue;
 
@@ -22,143 +23,114 @@ namespace Exquance
             IValidator _validator = new Validator();
             ICellProcessor _cellService = new CellProcessor();
 
-            Interactions.GreetUser();
+            Console.WriteLine("Hello, user! Please follow instructions below: \n");
 
             List<UserInput> inputs = new();
 
             bool userFinished = false;
+
+            string path = null, formula = null;
+            bool consoleOutput = false, fileOutput = false, pathIsValid = false, formulaIsValid = false;
             while (!userFinished)
             {
-                string path = null, outputParam = null, formula = null;
-                bool pathIsValid = false;
-                while (!pathIsValid)
+                while (!pathIsValid || !formulaIsValid)
                 {
-                    Interactions.AskForSrcFilePath();
-                    string input = Console.ReadLine();
-
-                    if (input.Equals("start"))
+                    Console.WriteLine("Enter source file path, output parameter (-c for console, -f for file) and formula");
+                    Console.WriteLine("Example: D:\\Exquance\\1.txt -c -formula x+25-3");
+                    string userInput = Console.ReadLine();
+                    if (userInput.Equals("start"))
                     {
-                        if (!inputs.Any())
-                        {
-                            Console.WriteLine("At least one file is required for proceeding");
-                        }
-                        else
-                        {
-                            userFinished = true;
-                            break;
-                        }
+                        userFinished = true;
+                        break;
                     }
-                    else
+                    else if (!string.IsNullOrEmpty(userInput))
                     {
-                        if (_validator.FilePathIsValid(input, inputs.Select(i => i.Path)))
+                        try
                         {
-                            path = input;
-                            pathIsValid = true;
+                            path = userInput.Substring(0, userInput.IndexOf(".txt") + 4);
+                            consoleOutput = userInput.Contains(" -c ");
+                            fileOutput = userInput.Contains(" -f ");
+                            formula = userInput.Substring(userInput.IndexOf("-formula") + 8).ToLower().RemoveAllWhiteSpaces();
+
+                            pathIsValid = _validator.FilePathIsValid(path, inputs.Select(i => i.Path));
+                            formulaIsValid = _validator.FormulaIsValid(formula);
+                        }
+                        catch (Exception)
+                        {
+                            Console.WriteLine("Wrong input");
+                            continue;
                         }
                     }
                 }
                 if (userFinished) break;
-
-                bool outputParamIsValid = false;
-                while (!outputParamIsValid)
-                {
-                    Interactions.AskForOutParameter();
-                    string input = Console.ReadLine();
-                    if (_validator.OutParameterIsValid(input))
-                    {
-                        outputParam = input;
-                        outputParamIsValid = true;
-                    }
-                }
-                bool formulaIsValid = false;
-                while (!formulaIsValid)
-                {
-                    Interactions.AskForFormula();
-                    string input = Console.ReadLine().RemoveAllWhiteSpaces();
-                    if (_validator.FormulaIsValid(input))
-                    {
-                        formula = input;
-                        formulaIsValid = true;
-                    }
-                }
-                if (pathIsValid && outputParamIsValid && formulaIsValid)
-                {
-                    inputs.Add(new UserInput
-                    {
-                        Path = path,
-                        Formula = formula,
-                        OutputParam = outputParam
-                    });
-                    Console.WriteLine("\nFile accepted\n");
-                }
+                UserInput model = new(path, consoleOutput, fileOutput, formula);
+                inputs.Add(model);
+                Console.WriteLine("\nFile accepted\nType 'start' to finish entering files and start calculation");
+                pathIsValid = false; formulaIsValid = false;
             }
 
-            IEnumerable<UserInput> consoleParamInputs = inputs.Where(i => i.OutputParam.RemoveAllWhiteSpaces().ToLower().Equals("-c"));
-            IEnumerable<UserInput> fileParamInputs = inputs.Except(consoleParamInputs);
+            string variable = formula.First(ch => char.IsLetter(ch)).ToString();
 
-            if (fileParamInputs.Any())
+            Parallel.ForEach(inputs, async input =>
             {
-                await Task.Run(() =>
+                var folder = Path.GetDirectoryName(input.Path);
+                var fileName = Path.GetFileName(input.Path);
+                var outputFilePath = $"{folder}\\Thread{Thread.CurrentThread.ManagedThreadId}-{fileName}";
+                if (File.Exists(outputFilePath))
+                    File.Delete(outputFilePath);
+
+                List<FileLine> fileLines = new();
+                using (var file = new StreamReader(input.Path))
                 {
-                    Parallel.ForEach(fileParamInputs, async input =>
+                    int counter = 1;
+                    string ln;
+
+                    while ((ln = file.ReadLine()) != null)
                     {
-                        var folder = Path.GetDirectoryName(input.Path);
-                        var fileName = Path.GetFileName(input.Path);
-                        var fileLines = await File.ReadAllLinesAsync(input.Path);
-                        if (!_validator.FileLinesAreValid(fileLines))
-                        {
-                            Console.WriteLine($"{fileName} is not a valid file");
-                            return;
-                        }
+                        fileLines.Add(new FileLine(counter, ln));
+                        counter++;
+                    }
+                }
 
-                        var outputFilePath = $"{folder}\\Thread{Thread.CurrentThread.ManagedThreadId}-{fileName}";
-                        if (File.Exists(outputFilePath))
-                            File.Delete(outputFilePath);
+                var consoleTask = new Task(() =>
+                {
+                    Parallel.ForEach(fileLines, fl =>
+                    {
+                        Console.WriteLine($"{fl.LineNum}: {fl.LineVal}: {_evaluator.EvaluateExpression(formula.Replace(variable, fl.LineVal))}");
+                    });
+                });
 
-                        using (StreamWriter writer = new(outputFilePath, true)) // true to append data to the file
+                var fileTask = new Task(() =>
+                {
+                    Parallel.ForEach(fileLines, fl =>
+                    {
+                        var calculatedVal = _evaluator.EvaluateExpression(input.Formula.ToLower().Replace(variable, fl.LineVal));
+                        lock (locker)
                         {
-                            int lineNum = 0;
-                            foreach (var line in fileLines)
+                            using (StreamWriter writer = new(outputFilePath, true)) // true to append data to the file
                             {
-                                lineNum++;
-                                var lineVal = int.Parse(line.RemoveAllWhiteSpaces());
-                                var variable = input.Formula.ToLower().First(ch => char.IsLetter(ch)).ToString();
-                                var calculatedVal = _evaluator.EvaluateExpression(input.Formula.ToLower().Replace(variable, lineVal.ToString()));
-                                await writer.WriteLineAsync($"{lineNum}: {lineVal}: {calculatedVal}");
+                                writer.WriteLine($"{fl.LineNum}: {fl.LineVal}: {calculatedVal}");
                             }
                         }
                     });
-                    Interactions.AnnounceSuccess();
                 });
-            }
-            
-            if (consoleParamInputs.Any())
-            {
-                await Task.Run(async () =>
-                {
-                    foreach (var input in consoleParamInputs)
-                    {
-                        var fileName = Path.GetFileName(input.Path);
-                        var fileLines = await File.ReadAllLinesAsync(input.Path);
-                        if (!_validator.FileLinesAreValid(fileLines))
-                        {
-                            Console.WriteLine($"{fileName} is not a valid file");
-                            continue;
-                        }
 
-                        int lineNum = 0;
-                        Console.WriteLine($"\n{fileName}:\n");
-                        foreach (var line in fileLines)
-                        {
-                            lineNum++;
-                            var lineVal = int.Parse(line.RemoveAllWhiteSpaces());
-                            var variable = input.Formula.ToLower().First(ch => char.IsLetter(ch)).ToString();
-                            var calculatedVal = _evaluator.EvaluateExpression(input.Formula.ToLower().Replace(variable, lineVal.ToString()));
-                            Console.WriteLine($"{lineNum}: {lineVal}: {calculatedVal}");
-                        }
-                    }
-                });
-            }
+                if (input.WriteToConsole && !input.WriteToFile)
+                {
+                    consoleTask.Start();
+                    await Task.WhenAll(consoleTask);
+                }
+                else if (input.WriteToFile && !input.WriteToConsole)
+                {
+                    fileTask.Start();
+                    await Task.WhenAll(fileTask);
+                }
+                else if (input.WriteToFile && input.WriteToConsole)
+                {
+                    consoleTask.Start(); fileTask.Start();
+                    await Task.WhenAll(consoleTask, fileTask);
+                }
+            });
 
             Console.ReadKey();
         }

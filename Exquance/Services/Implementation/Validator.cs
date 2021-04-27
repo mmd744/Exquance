@@ -14,21 +14,6 @@ namespace Exquance.Services.Implementation
 {
     public class Validator : BaseValidator, IValidator
     {
-
-        public bool FileLinesAreValid(string[] fileLines)
-        {
-            bool result = true;
-            Parallel.ForEach(fileLines, fl =>
-            {
-                if (!int.TryParse(fl.RemoveAllWhiteSpaces(), out int num))
-                {
-                    result = false;
-                }
-            });
-
-            return result;
-        }
-
         public bool FilePathIsValid(string filePath, IEnumerable<string> alreadyStoredPaths)
         {
             if (!base.ParamIsValid(filePath, "File path", out string errMsg))
@@ -36,14 +21,14 @@ namespace Exquance.Services.Implementation
                 Console.WriteLine(errMsg);
                 return false;
             }
-            else if (!IsAccessible(filePath))
-            {
-                Console.WriteLine("Not enough permissions for accessing this file");
-                return false;
-            }
             else if (!File.Exists(filePath))
             {
                 Console.WriteLine("File not found");
+                return false;
+            }
+            else if (!IsAccessible(filePath))
+            {
+                Console.WriteLine("Not enough permissions for accessing this file");
                 return false;
             }
             else if (alreadyStoredPaths.Contains(filePath))
@@ -121,21 +106,6 @@ namespace Exquance.Services.Implementation
             {
                 return false;
             }
-        }
-
-        public bool OutParameterIsValid(string outParameter)
-        {
-            if (!base.ParamIsValid(outParameter, "Out parameter", out string errMsg))
-            {
-                Console.WriteLine(errMsg);
-                return false;
-            }
-            else if (!outParameter.Equals("-c") && !outParameter.Equals("-f"))
-            {
-                Console.WriteLine("Wrong our parameter");
-                return false;
-            }
-            return true;
         }
     }
 }

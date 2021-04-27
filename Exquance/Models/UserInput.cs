@@ -8,8 +8,16 @@ namespace Exquance.Models
 {
     public class UserInput
     {
-        public string Path { get; set; }
-        public string OutputParam { get; set; }
-        public string Formula { get; set; }
+        public UserInput(string path, bool console, bool file, string formula)
+        {
+            Path = path;
+            WriteToConsole = console;
+            WriteToFile = file;
+            Formula = formula;
+        }
+        public string Path { get; }
+        public bool WriteToConsole { get; }
+        public bool WriteToFile { get; }
+        public string Formula { get; }
     }
 }
