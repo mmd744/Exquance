@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Exquance.Extensions;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,13 +9,15 @@ namespace Exquance.Models
 {
     public class FileLine
     {
-        public FileLine(string value, int index)
+        public FileLine(int lineNum, string lineVal)
         {
-            Value = int.Parse(value);
-            LineNumber = index;
+            LineNum = lineNum;
+            if (int.TryParse(lineVal.RemoveAllWhiteSpaces(), out int actualValue))
+                LineVal = lineVal;
+            else
+                LineVal = "Not a number";
         }
-        public int LineNumber { get; set; }
-        public int Value { get; set; }
-        public int CalculatedValue { get; set; }
+        public int LineNum { get; }
+        public string LineVal { get; }
     }
 }

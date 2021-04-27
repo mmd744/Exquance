@@ -8,10 +8,7 @@ namespace Exquance.Services.Abstract
 {
     public interface IValidator
     {
-        bool FilesCountIsValid(string filesCount, out int count);
-        bool FilePathIsValid(string filePath);
-        bool FileLinesAreValid(string[] fileLines);
-        bool OutParameterIsValid(string outParameter);
+        bool FilePathIsValid(string filePath, IEnumerable<string> inputs);
         bool FormulaIsValid(string formula);
     }
 }

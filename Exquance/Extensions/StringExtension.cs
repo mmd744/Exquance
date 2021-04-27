@@ -15,6 +15,9 @@ namespace Exquance.Extensions
         /// <returns></returns>
         public static string RemoveAllWhiteSpaces(this string val)
         {
+            if (string.IsNullOrEmpty(val)) 
+                return null;
+
             return val.Replace(" ", string.Empty);
         }
     }

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Exquance.Services.Implementation
 {
-    public class ExpressionEvaluator : Abstract.IExpressionEvaluator
+    public class ExpressionEvaluator : IExpressionEvaluator
     {
         private readonly ICellProcessor _cellProcessor;
 
