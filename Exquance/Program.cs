@@ -43,23 +43,20 @@ namespace Exquance
                         userFinished = true;
                         break;
                     }
-                    else if (!string.IsNullOrEmpty(userInput))
+                    try
                     {
-                        try
-                        {
-                            path = userInput.Substring(0, userInput.IndexOf(".txt") + 4);
-                            consoleOutput = userInput.Contains(" -c ");
-                            fileOutput = userInput.Contains(" -f ");
-                            formula = userInput.Substring(userInput.IndexOf("-formula") + 8).ToLower().RemoveAllWhiteSpaces();
+                        path = userInput.Substring(0, userInput.IndexOf(".txt") + 4);
+                        consoleOutput = userInput.Contains(" -c ");
+                        fileOutput = userInput.Contains(" -f ");
+                        formula = userInput.Substring(userInput.IndexOf("-formula") + 8).ToLower().RemoveAllWhiteSpaces();
 
-                            pathIsValid = _validator.FilePathIsValid(path, inputs.Select(i => i.Path));
-                            formulaIsValid = _validator.FormulaIsValid(formula);
-                        }
-                        catch (Exception)
-                        {
-                            Console.WriteLine("Wrong input");
-                            continue;
-                        }
+                        pathIsValid = _validator.FilePathIsValid(path, inputs.Select(i => i.Path));
+                        formulaIsValid = _validator.FormulaIsValid(formula);
+                    }
+                    catch (Exception)
+                    {
+                        Console.WriteLine("Wrong input");
+                        continue;
                     }
                 }
                 if (userFinished) break;
@@ -73,63 +70,57 @@ namespace Exquance
 
             Parallel.ForEach(inputs, async input =>
             {
-                var folder = Path.GetDirectoryName(input.Path);
-                var fileName = Path.GetFileName(input.Path);
-                var outputFilePath = $"{folder}\\Thread{Thread.CurrentThread.ManagedThreadId}-{fileName}";
-                if (File.Exists(outputFilePath))
-                    File.Delete(outputFilePath);
-
                 List<FileLine> fileLines = new();
                 using (var file = new StreamReader(input.Path))
                 {
-                    int counter = 1;
+                    int counter = 0;
                     string ln;
 
                     while ((ln = file.ReadLine()) != null)
                     {
-                        fileLines.Add(new FileLine(counter, ln));
                         counter++;
+                        fileLines.Add(new FileLine(counter, ln));
                     }
                 }
 
-                var consoleTask = new Task(() =>
+                Task consoleTask = null, fileTask = null;
+                List<Task> actualTasks = new();
+                if (input.WriteToConsole)
                 {
-                    Parallel.ForEach(fileLines, fl =>
+                    consoleTask = Task.Run(() =>
                     {
-                        Console.WriteLine($"{fl.LineNum}: {fl.LineVal}: {_evaluator.EvaluateExpression(formula.Replace(variable, fl.LineVal))}");
-                    });
-                });
-
-                var fileTask = new Task(() =>
-                {
-                    Parallel.ForEach(fileLines, fl =>
-                    {
-                        var calculatedVal = _evaluator.EvaluateExpression(input.Formula.ToLower().Replace(variable, fl.LineVal));
-                        lock (locker)
+                        Parallel.ForEach(fileLines, fl =>
                         {
-                            using (StreamWriter writer = new(outputFilePath, true)) // true to append data to the file
-                            {
-                                writer.WriteLine($"{fl.LineNum}: {fl.LineVal}: {calculatedVal}");
-                            }
-                        }
+                            Console.WriteLine($"{fl.LineNum}: {fl.LineVal}: {_evaluator.EvaluateExpression(formula.Replace(variable, fl.LineVal))}");
+                        });
                     });
-                });
+                    actualTasks.Add(consoleTask);
+                }
+                if (input.WriteToFile)
+                {
+                    var folder = Path.GetDirectoryName(input.Path);
+                    var fileName = Path.GetFileName(input.Path);
+                    var outputFilePath = $"{folder}\\Thread{Thread.CurrentThread.ManagedThreadId}-{fileName}";
+                    if (File.Exists(outputFilePath))
+                        File.Delete(outputFilePath);
 
-                if (input.WriteToConsole && !input.WriteToFile)
-                {
-                    consoleTask.Start();
-                    await Task.WhenAll(consoleTask);
+                    fileTask = Task.Run(() =>
+                    {
+                        Parallel.ForEach(fileLines, fl =>
+                        {
+                            var calculatedVal = _evaluator.EvaluateExpression(input.Formula.ToLower().Replace(variable, fl.LineVal));
+                            lock (locker)
+                            {
+                                using (StreamWriter writer = new(outputFilePath, true)) // true to append data to the file
+                                {
+                                    writer.WriteLine($"{fl.LineNum}: {fl.LineVal}: {calculatedVal}");
+                                }
+                            }
+                        });
+                    });
+                    actualTasks.Add(fileTask);
                 }
-                else if (input.WriteToFile && !input.WriteToConsole)
-                {
-                    fileTask.Start();
-                    await Task.WhenAll(fileTask);
-                }
-                else if (input.WriteToFile && input.WriteToConsole)
-                {
-                    consoleTask.Start(); fileTask.Start();
-                    await Task.WhenAll(consoleTask, fileTask);
-                }
+                await Task.WhenAll(actualTasks);
             });
 
             Console.ReadKey();
